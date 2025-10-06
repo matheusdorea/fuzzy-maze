@@ -18,10 +18,34 @@ robot_size = (60, 40)
 robot_surf = pygame.Surface(robot_size, pygame.SRCALPHA)
 robot_surf.fill((255, 0, 0))
 
-arena_rect = pygame.Rect(100, 100, 800, 500)
-
-sensor_angles = [0, 90, -90, 45, -45]  # frente, direita, esquerda, diag direita, diag esquerda
+sensor_angles = [0, -90, 90, -45, 45]  # frente, direita, esquerda, diag direita, diag esquerda
 sensor_range = 200
+
+# === Mapa textual ===
+map_str = """
+S . . █ # . █ . . █
+# . # . # . . . . .
+█ . # . . # . . # █
+. # . # # █ . . . .
+█ . . . . . . . █ █
+. . # . . █ # . . #
+█ . . . # . # # # █
+. . . . # . # # █ .
+█ █ . . # . . . . █
+. █ # . █ # # █ # E
+"""
+
+# === Converte para matriz (lista de listas) ===
+maze = [row.split() for row in map_str.strip().split("\n")]
+tile_size = 100
+
+colors = {
+    "█": (0, 0, 0),       # Parede - preto
+    ".": (255, 255, 255), # Espaço livre - branco
+    "#": (160, 160, 160), # Espaço especial - cinza
+    "S": (0, 200, 0),     # Início - verde
+    "E": (200, 0, 0)      # Final - vermelho
+}
 
 # === Loop principal ===
 while running:
@@ -38,7 +62,12 @@ while running:
         degree -= rotation_speed
 
     screen.fill("white")
-    pygame.draw.rect(screen, (0, 0, 0), arena_rect, 5)
+    for y, row in enumerate(maze):
+        for x, cell in enumerate(row):
+            color = colors.get(cell, (255,255,255))  # padrão: branco
+            rect = pygame.Rect(x * tile_size, y * tile_size, tile_size, tile_size)
+            pygame.draw.rect(screen, color, rect)
+            pygame.draw.rect(screen, (100,100,100), rect, 1)  # grade leve
 
     rotated_robot = pygame.transform.rotate(robot_surf, degree)
     rect = rotated_robot.get_rect(center=player_pos)
@@ -53,14 +82,25 @@ while running:
         dx = math.cos(math.radians(angle))
         dy = -math.sin(math.radians(angle))  # invertido no pygame
         # Raycasting
+        
+        distance = sensor_range
         for d in range(sensor_range):
             test_x = int(player_pos.x + dx*d)
             test_y = int(player_pos.y + dy*d)
-            if not arena_rect.collidepoint(test_x, test_y):
+            # Descobre qual célula o ponto está
+            cell_x = test_x // tile_size
+            cell_y = test_y // tile_size
+
+            # Verifica se está dentro dos limites do mapa
+            if 0 <= cell_y < len(maze) and 0 <= cell_x < len(maze[0]):
+                # Se for parede preta, para o raio
+                if maze[cell_y][cell_x] == "█":
+                    distance = d
+                    break
+            else:
+                # Fora do mapa, para o raio
                 distance = d
                 break
-            else:
-                distance = sensor_range
                 
         sensor_distances.append(distance)
                 
@@ -88,8 +128,8 @@ while running:
     else:
         steer_angle = 0
             
-    
-    #degree += steer_angle
+    degree = round(degree, 2)
+    degree += steer_angle
     degree %= 360  # Mantém o ângulo entre 0a-359
     #atualiza a posição
     dx = math.cos(math.radians(degree))
